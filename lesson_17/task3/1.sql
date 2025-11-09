@@ -1,0 +1,1 @@
+pg_dump -U postgres -d my_database -f backup_$(date +%Y%m%d_%H%M%S).sql
