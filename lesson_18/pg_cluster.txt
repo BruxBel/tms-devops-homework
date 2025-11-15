@@ -1,0 +1,154 @@
+1. Очистка и подготовка
+
+# Останавливаем и удаляем старые контейнеры
+docker stop pg-primary pg-replica 2>/dev/null
+docker rm pg-primary pg-replica 2>/dev/null
+
+# Удаляем старые volumes
+docker volume rm pg-primary-data pg-replica-data 2>/dev/null
+
+# Создаем сеть
+docker network create pg-network 2>/dev/null || true
+
+2. Запуск первичного сервера
+
+# Создаем volumes
+docker volume create pg-primary-data
+docker volume create pg-replica-data
+
+# Запускаем первичный сервер
+docker run -d \
+  --name pg-primary \
+  --network=pg-network \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=postgres \
+  -v pg-primary-data:/var/lib/postgresql/data \
+  -p 5432:5432 \
+  postgres:15
+  
+3. Настройка первичного сервера
+
+# Ждем запуска PostgreSQL
+sleep 10
+
+# Настраиваем конфигурацию репликации
+docker exec -i pg-primary bash << 'EOF'
+echo "wal_level = replica" >> /var/lib/postgresql/data/postgresql.conf
+echo "max_wal_senders = 10" >> /var/lib/postgresql/data/postgresql.conf
+echo "max_replication_slots = 10" >> /var/lib/postgresql/data/postgresql.conf
+echo "wal_keep_size = 64MB" >> /var/lib/postgresql/data/postgresql.conf
+echo "hot_standby = on" >> /var/lib/postgresql/data/postgresql.conf
+
+# Настраиваем аутентификацию для репликации
+echo "host replication all 0.0.0.0/0 md5" >> /var/lib/postgresql/data/pg_hba.conf
+echo "host all all 0.0.0.0/0 md5" >> /var/lib/postgresql/data/pg_hba.conf
+EOF
+
+# Перезапускаем первичный сервер
+docker restart pg-primary
+sleep 5
+
+# Создаем пользователя для репликации
+docker exec -i pg-primary psql -U postgres -c "CREATE USER repl_user WITH REPLICATION ENCRYPTED PASSWORD 'repl_password';"
+docker exec -i pg-primary psql -U postgres -c "SELECT pg_create_physical_replication_slot('replication_slot');"
+
+4. Создание тестовых данных на первичном сервере
+
+docker exec -i pg-primary psql -U postgres << 'EOF'
+-- Создаем тестовую базу данных
+CREATE DATABASE testdb;
+
+-- Подключаемся к тестовой базе
+\c testdb
+
+-- Создаем таблицу
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Заполняем тестовыми данными
+INSERT INTO users (name, email) VALUES 
+('Иван Иванов', 'ivan@example.com'),
+('Петр Петров', 'petr@example.com'),
+('Мария Сидорова', 'maria@example.com'),
+('Анна Козлова', 'anna@example.com'),
+('Сергей Смирнов', 'sergey@example.com');
+
+-- Проверяем данные
+SELECT * FROM users;
+EOF
+
+5. Настройка реплики
+
+# Запускаем реплику (пока остановленную)
+docker run -d \
+  --name pg-replica \
+  --network=pg-network \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=postgres \
+  -v pg-replica-data:/var/lib/postgresql/data \
+  -p 5433:5432 \
+  postgres:15
+
+# Останавливаем реплику для настройки
+docker stop pg-replica
+
+# Очищаем данные реплики и делаем базовую копию
+docker exec -i pg-replica bash << 'EOF'
+rm -rf /var/lib/postgresql/data/*
+pg_basebackup -h pg-primary -D /var/lib/postgresql/data -U repl_user -v -P -R -X stream -S replication_slot -W
+EOF
+
+# Вводим пароль когда запросит: repl_password
+
+# Настраиваем файлы реплики
+docker exec -i pg-replica bash << 'EOF'
+echo "primary_conninfo = 'host=pg-primary port=5432 user=repl_user password=repl_password application_name=pg-replica'" >> /var/lib/postgresql/data/postgresql.conf
+echo "primary_slot_name = 'replication_slot'" >> /var/lib/postgresql/data/postgresql.conf
+echo "hot_standby = on" >> /var/lib/postgresql/data/postgresql.conf
+touch /var/lib/postgresql/data/standby.signal
+EOF
+
+# Запускаем реплику
+docker start pg-replica
+
+# Ждем запуска реплики
+sleep 10
+
+6. Проверка репликации
+
+# Проверяем статус репликации на первичном сервере
+echo "=== Статус репликации на PRIMARY ==="
+docker exec -i pg-primary psql -U postgres -c "SELECT application_name, state, sync_state FROM pg_stat_replication;"
+
+# Проверяем данные на реплике
+echo "=== Проверка данных на REPLICA ==="
+docker exec -i pg-replica psql -U postgres -d testdb -c "SELECT * FROM users;"
+
+# Проверяем режим реплики
+echo "=== Режим REPLICA ==="
+docker exec -i pg-replica psql -U postgres -c "SELECT pg_is_in_recovery();"
+
+# Добавляем еще данные на первичный сервер для проверки
+echo "=== Добавляем дополнительные данные на PRIMARY ==="
+docker exec -i pg-primary psql -U postgres -d testdb -c "INSERT INTO users (name, email) VALUES ('Ольга Новикова', 'olga@example.com');"
+
+# Проверяем что данные реплицировались
+echo "=== Проверка репликации новых данных ==="
+docker exec -i pg-replica psql -U postgres -d testdb -c "SELECT * FROM users;"
+
+7. Дополнительные проверки
+
+# Пытаемся записать в реплику (должно быть запрещено)
+echo "=== Попытка записи в REPLICA ==="
+docker exec -i pg-replica psql -U postgres -d testdb -c "INSERT INTO users (name, email) VALUES ('Тест', 'test@example.com');" 2>/dev/null || echo "Запись в реплику запрещена - это нормально!"
+
+# Проверяем лаг репликации
+echo "=== Лаг репликации ==="
+docker exec -i pg-primary psql -U postgres -c "SELECT pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) AS replication_lag FROM pg_stat_replication;"
+
