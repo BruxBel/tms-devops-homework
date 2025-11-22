@@ -1,0 +1,9 @@
+---
+- name: Validate nginx configuration
+  command: nginx -t
+  register: nginx_validation
+  changed_when: false
+
+- name: Show validation result
+  debug:
+    msg: "{{ nginx_validation.stdout }}"

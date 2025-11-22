@@ -1,0 +1,18 @@
+---
+# Порт для nginx
+webserver_port: 80
+
+# Путь к приложению
+app_path: /var/www/html
+
+# Имя сервера
+server_name: localhost
+
+# Пользователь и группа для Ubuntu
+webserver_user: www-data
+webserver_group: www-data
+
+# Дополнительные пакеты для Ubuntu
+additional_packages:
+  - curl
+  - ufw

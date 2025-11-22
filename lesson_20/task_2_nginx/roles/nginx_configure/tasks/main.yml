@@ -1,0 +1,56 @@
+---
+- name: Update apt cache and upgrade system
+  apt:
+    upgrade: dist
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install required packages
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - nginx
+    - curl
+
+- name: Create application directory
+  file:
+    path: "{{ app_path }}"
+    state: directory
+    owner: "{{ webserver_user }}"
+    group: "{{ webserver_group }}"
+    mode: '0755'
+
+- name: Deploy index.html
+  template:
+    src: index.html.j2
+    dest: "{{ app_path }}/index.html"
+    owner: "{{ webserver_user }}"
+    group: "{{ webserver_group }}"
+    mode: '0644'
+  notify: restart nginx
+
+- name: Backup original nginx config
+  command:
+    cmd: cp /etc/nginx/sites-available/default /etc/nginx/sites-available/default.backup
+    creates: /etc/nginx/sites-available/default.backup
+
+- name: Configure nginx
+  template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/sites-available/default
+    backup: yes
+  notify: restart nginx
+
+- name: Ensure nginx is enabled and running
+  systemd:
+    name: nginx
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+- name: Open firewall port for nginx
+  ufw:
+    rule: allow
+    port: "{{ webserver_port }}"
+    proto: tcp

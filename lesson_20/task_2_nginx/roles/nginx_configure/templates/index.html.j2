@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ server_name }} - Ubuntu</title>
+    <style>
+        body {
+            font-family: 'Ubuntu', Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #dd4814 0%, #77216F 100%);
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        .ubuntu-logo {
+            text-align: center;
+            font-size: 3em;
+            margin-bottom: 20px;
+        }
+        .info-card {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+        .success {
+            text-align: center;
+            font-size: 1.2em;
+            margin-top: 30px;
+            padding: 15px;
+            background: rgba(76, 175, 80, 0.3);
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="ubuntu-logo">🐧</div>
+        <h1>Ubuntu Server Ready!</h1>
+        
+        <div class="info-card">
+            <h3>Server Configuration</h3>
+            <p><strong>Hostname:</strong> {{ ansible_hostname }}</p>
+            <p><strong>Web Server:</strong> Nginx</p>
+            <p><strong>Port:</strong> {{ webserver_port }}</p>
+            <p><strong>Application Path:</strong> {{ app_path }}</p>
+            <p><strong>Server Name:</strong> {{ server_name }}</p>
+        </div>
+
+        <div class="info-card">
+            <h3>Ubuntu System Information</h3>
+            <p><strong>OS:</strong> {{ ansible_distribution }} {{ ansible_distribution_version }}</p>
+            <p><strong>Kernel:</strong> {{ ansible_kernel }}</p>
+            <p><strong>Architecture:</strong> {{ ansible_architecture }}</p>
+            <p><strong>Deployed:</strong> {{ ansible_date_time.iso8601 }}</p>
+            <p><strong>Ansible User:</strong> {{ ansible_user_id }}</p>
+        </div>
+
+        <div class="success">
+            ✅ Nginx successfully configured on Ubuntu by Ansible!
+        </div>
+    </div>
+</body>
+</html>
