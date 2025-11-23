@@ -1,6 +1,5 @@
 - name: Deploy and configure nginx on Ubuntu
   hosts: linux-servers
-  become: yes
   vars:
     webserver_port: 8080
     app_path: /var/www/myapp
