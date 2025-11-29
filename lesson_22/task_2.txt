@@ -1,0 +1,14 @@
+1. Посмотрел список образов:
+docker images
+
+2. Проверил размер образа hello-world:
+docker inspect hello-world --format='{{.Size}}'
+
+3. Удалил ненужные образы:
+docker rmi hello-world
+
+4. Выполнил глобальную очистку:
+docker system prune -y
+
+5. Проверил результат:
+docker system df

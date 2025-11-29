@@ -1,0 +1,8 @@
+1. Запустил контейнер с именем `my-hello-world`:
+docker run --name my-hello-world -p 8080:80 hello-world
+
+2. Проверил статус:
+docker ps -a
+
+3. Удалил контейнер:
+docker rm my-hello-world
