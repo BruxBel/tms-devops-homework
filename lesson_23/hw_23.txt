@@ -1,0 +1,59 @@
+Шаг 1: Запуск первого контейнера
+
+	docker run -d --name my-web -p 8080:80 -e NGINX_PORT=80 nginx
+
+Шаг 2: Создание Docker volume
+
+	docker volume create my-volume
+
+
+Шаг 3: Запуск контейнера с volume
+
+	docker stop my-web
+	docker rm my-web
+
+	docker run -d --name my-web -p 8080:80 -e NGINX_PORT=80 -v my-volume:/usr/share/nginx/html nginx
+
+Шаг 4: Создание Docker network
+
+	docker network create my-network
+
+	docker network connect my-network my-web
+
+
+Шаг 5: Второй контейнер в той же сети**
+
+	docker run -d --name my-web-2 -p 8081:80 -e NGINX_PORT=80 --network my-network nginx
+
+
+Шаг 6: Создание файла в volume через первый контейнер**
+
+
+	docker exec -it my-web /bin/bash
+
+Внутри контейнера:
+	apt update && apt install -y nano
+	cd /usr/share/nginx/html
+	touch test.log
+	echo 'log here' >> test.log
+
+
+Шаг 7: Логирование через logger**
+
+	logger -t DOCKER_TEST "Log message from container 1" -s 2>&1 | tee -a /usr/share/nginx/html/test.log
+
+Шаг 8: Проверка логов контейнера**
+
+	docker logs my-web
+
+Шаг 9: Проверка доступа к файлу из второго контейнера**
+
+	docker exec my-web-2 cat /usr/share/nginx/html/test.log
+
+Шаг 10: Остановка и очистка
+
+	docker stop my-web my-web-2
+	docker rm my-web my-web-2
+	docker rmi nginx
+	docker volume rm my-volume
+	docker network rm my-network
