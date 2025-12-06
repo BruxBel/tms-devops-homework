@@ -21,12 +21,12 @@
 	docker network connect my-network my-web
 
 
-Шаг 5: Второй контейнер в той же сети**
+Шаг 5: Второй контейнер в той же сети
 
 	docker run -d --name my-web-2 -p 8081:80 -e NGINX_PORT=80 --network my-network nginx
 
 
-Шаг 6: Создание файла в volume через первый контейнер**
+Шаг 6: Создание файла в volume через первый контейнер
 
 
 	docker exec -it my-web /bin/bash
@@ -38,15 +38,15 @@
 	echo 'log here' >> test.log
 
 
-Шаг 7: Логирование через logger**
+Шаг 7: Логирование через logger
 
 	logger -t DOCKER_TEST "Log message from container 1" -s 2>&1 | tee -a /usr/share/nginx/html/test.log
 
-Шаг 8: Проверка логов контейнера**
+Шаг 8: Проверка логов контейнера
 
 	docker logs my-web
 
-Шаг 9: Проверка доступа к файлу из второго контейнера**
+Шаг 9: Проверка доступа к файлу из второго контейнера
 
 	docker exec my-web-2 cat /usr/share/nginx/html/test.log
 
