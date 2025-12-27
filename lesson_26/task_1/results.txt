@@ -1,0 +1,4 @@
+8.8.8.8: Available
+127.0.0.1: Available
+1.1.1.1: Available
+256.256.256.256: Unavailabe
