@@ -1,0 +1,99 @@
+def remote_host = [:]
+pipeline {
+    agent any
+
+    parameters {
+        booleanParam(
+            name: "RUN_TESTS",
+            defaultValue: true,
+            description: "Run auto tests"
+        )
+        string(
+            name: 'IMAGE_TAG',
+            defaultValue: 'latest'
+        )
+    }
+
+    environment {
+        HOST = '192.168.65.129'
+        HOST_PRJ_DIR = '/var/www/counter'
+
+        DOCKER_USER = 'bruxbel'
+        DOCKER_TOKEN = credentials('docker-token')
+        DOCKER_REPO = 'bruxbel/counter'
+
+        GIT_URL = 'git@github.com:BruxBel/tms-devops-homework.git'
+        GIT_PRJ_DIR = '29_Jenkins_pipeline'
+    }
+
+    stages {
+        stage('Configure credentials') {
+            steps {
+                withCredentials([sshUserPrivateKey(credentialsId: 'jenkins-key', keyFileVariable: 'private_key', usernameVariable: 'username')]) {
+                    script {
+                        remote_host.name = "${env.HOST}"
+                        remote_host.host = "${env.HOST}"
+                        remote_host.user = "$username"
+                        remote_host.identity = readFile "$private_key"
+                        remote_host.allowAnyHosts = true
+                    }
+                }
+            }
+        }
+
+        stage('Checkout repo') {
+            steps {
+                git branch: 'main',
+                url: "${env.GIT_URL}",
+                credentialsId: 'jenkins-key'
+            }
+        }
+
+
+        stage('Build docker image') {
+            steps {
+                script {
+                    env.IMAGE = "${env.DOCKER_REPO}:${params.IMAGE_TAG}"
+                    sh """
+                        docker build -t ${env.IMAGE} ${env.GIT_PRJ_DIR}
+                    """
+                }
+            }
+        }
+
+        stage('Tests') {
+            steps {
+                script {
+                    sh """
+                        echo "Tests"
+                    """
+                }
+            }
+        }
+
+        stage('Push image') {
+            steps {
+                script {
+                    sh """
+                        docker login -u ${env.DOCKER_USER} -p ${env.DOCKER_TOKEN} 
+                        docker push ${env.IMAGE}
+                        docker logout
+                    """
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                script {
+                    sshCommand remote: remote_host, command: """
+                        docker pull ${env.IMAGE}
+                        cd ${env.HOST_PRJ_DIR}
+                        sed -i "s|image: bruxbel.*|image: ${env.IMAGE}|" compose.yml
+                        docker compose up -d
+                    """
+                }
+            }
+        }
+    }
+}
